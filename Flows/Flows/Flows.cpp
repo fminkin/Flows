@@ -47,7 +47,7 @@ public:
 			return flow == capacity;
 		}
 
-		long long getRemainingCapacity(){
+		long long getRemainingCapacity() const{
 			return capacity - flow;
 		}
 	};
@@ -59,7 +59,7 @@ public:
 		link[edge.from][edge.to].capacity += edge.capacity;
 	}
 
-	Network(const Graph &graph) : link(graph.vertices, std::vector<Link>(graph.vertices)),
+	explicit Network(const Graph &graph) : link(graph.vertices, std::vector<Link>(graph.vertices)),
 		nodes(graph.vertices), source(0), sink(graph.vertices - 1), totalFlow(0){
 		for (size_t edgeId = 0; edgeId < graph.edge.size(); ++edgeId)
 			addEdge(graph.edge[edgeId]);
@@ -78,7 +78,7 @@ public:
 	Network *network;
 	long long totalFlow;
 
-	MaxFlowAlgorithm(Network *network) : network(network), totalFlow(0)
+	explicit MaxFlowAlgorithm(Network *network) : network(network), totalFlow(0)
 	{
 	}
 
@@ -87,6 +87,7 @@ public:
 
 class MKMAlgorithm : public MaxFlowAlgorithm{
 public:
+	static enum direction { DOWN, UP };
 	class BFS{
 	public:
 		Network *network;
@@ -142,12 +143,12 @@ public:
 	vector<bool> usedNode;
 	vector<size_t> pointer[2];
 
-	MKMAlgorithm(Network *network) : MaxFlowAlgorithm(network), bfs(network),
+	explicit MKMAlgorithm(Network *network) : MaxFlowAlgorithm(network), bfs(network),
 		outCapacity(network->nodes), inCapacity(network->nodes), usedNode(network->nodes){
 		pointer[0] = pointer[1] = std::vector<size_t>(network->nodes);
 	}
 
-	long long getPotential(size_t node){
+	long long getPotential(size_t node) const{
 		if (node == network->source)
 			return outCapacity[node];
 		else if (node == network->sink)
@@ -156,16 +157,16 @@ public:
 			return min(inCapacity[node], outCapacity[node]);
 	}
 
-	void pushPreflow(size_t node, long long flow, bool direction){
+	void pushPreflow(size_t node, long long flow, direction d){
 		if (flow == 0)
 			return;
-		if (direction == 0 && node == network->sink)
+		if (d == DOWN && node == network->sink)
 			return;
-		if (direction == 1 && node == network->source)
+		if (d == UP && node == network->source)
 			return;
-		for (size_t &next = pointer[direction][node]; next < network->nodes; ++next){
+		for (size_t &next = pointer[d][node]; next < network->nodes; ++next){
 			size_t from = node, to = next;
-			if (direction)
+			if (d == UP)
 				std::swap(from, to);
 			if (usedNode[next])
 				continue;
@@ -179,7 +180,7 @@ public:
 			inCapacity[to] -= delta;
 			network->push(from, to, delta);
 			flow -= delta;
-			pushPreflow(next, delta, direction);
+			pushPreflow(next, delta, d);
 			if (flow == 0)
 				break;
 		}
@@ -234,8 +235,8 @@ public:
 				break;
 			long long delta = getPotential(node);
 			totalFlow += delta;
-			pushPreflow(node, delta, 0);
-			pushPreflow(node, delta, 1);
+			pushPreflow(node, delta, DOWN);
+			pushPreflow(node, delta, UP);
 			deleteNode(node);
 		}
 	}
@@ -274,11 +275,11 @@ public:
 		}
 	}
 
-	bool overflowed(size_t node){
+	bool overflowed(size_t node) const{
 		return node != network->sink && node != network->source && extra[node] > 0;
 	}
 
-	PushRelabelAlgorithm(Network *network) : MaxFlowAlgorithm(network), height(network->nodes),
+	explicit PushRelabelAlgorithm(Network *network) : MaxFlowAlgorithm(network), height(network->nodes),
 		extra(network->nodes), pointer(network->nodes){
 	}
 
@@ -337,10 +338,11 @@ int main(){
 	for (size_t edgeId = 0; edgeId < graph.edge.size(); ++edgeId)
 	{
 		Graph::Edge edge = graph.edge[edgeId];
-		long long flow = network.link [edge.from][edge.to].flow;
+		long long flow = network.link[edge.from][edge.to].flow;
 		long long result = std::max(long long(0), std::min(flow, edge.capacity));
 		network.push(edge.to, edge.from, result);
 		std::cout << result << '\n';
 	}
+	delete FlowWorker;
 	system("pause");
 }
